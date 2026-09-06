@@ -5,7 +5,7 @@ from mutagen.mp3 import MP3
 import mutagen.id3 as id3
 
 musicbrainzngs.set_useragent("MusicTagger", "0.1", "joeykhan0106@gmail.com")
-
+manual = False
 
 def get_cover_art(release_id):
     url = f"https://coverartarchive.org/release/{release_id}/front"
@@ -31,6 +31,7 @@ def get_track_position(release_id, recording_id):
 
 
 def tag_file(file_path, artist, song):
+    print(f'matching artist ({artist}) and title ({song})')
     query = f'recording:"{song}" AND artist:"{artist}" AND type:album AND NOT secondarytype:compilation'
     result = musicbrainzngs.search_recordings(query=query, limit=10)
 
@@ -42,8 +43,14 @@ def tag_file(file_path, artist, song):
     if not recordings:
         print(f'⚠ no match found')
         return
-
-    recording = recordings[0]
+    recording = None
+    if manual:
+        for i, record in enumerate(recordings):
+            print(f'[{i+1}]: {record['title']} - {record['artist-credit'][0]['artist']['name']}')
+        print('pick recording')
+        recording = recordings[int(input())-1]
+    else:
+        recording = recordings[0]
     print(f"  matched: {recording['title']} — {recording['artist-credit'][0]['artist']['name'] if recording.get('artist-credit') else '?'}")
 
     track_title = recording.get('title', song)
@@ -101,4 +108,5 @@ def tag_file(file_path, artist, song):
 
 
 if __name__ == "__main__":
-    tag_file('song.mp3', input('artist: '), input('track name: '))
+    manual = True
+    tag_file(input('file: '), input('artist: '), input('track name: '))

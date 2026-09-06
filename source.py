@@ -68,8 +68,10 @@ def main():
 
             print(f'[{i+1}/{len(entries)}] {title}')
             channel = entry.get('uploader') or entry.get('channel')
-            guess_a, guess_t = guess_artist_title(title, channel)
-
+            try:
+                guess_a, guess_t = guess_artist_title(title, channel)
+            except Exception as e:
+                print('something happened thats bad, idunno man', e)
             if playlist != '2':
                 artist = input(f'  artist [{guess_a or ""}]: ').strip() or guess_a
             name = input(f'  track name [{guess_t or ""}]: ').strip() or guess_t
