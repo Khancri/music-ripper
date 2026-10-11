@@ -55,4 +55,4 @@ def tag_file(file_path, artist, song):
 	tags.save()
 
 if __name__ == "__main__":
-	tag_file('song.mp3', input('artist: '), input('track name: '))
+	tag_file(input('file: '), input('artist: '), input('track name: '))
