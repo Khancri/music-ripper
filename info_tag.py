@@ -30,6 +30,26 @@ def get_track_position(release_id, recording_id):
     return None, None
 
 
+BAD_SECONDARY = {'compilation', 'live', 'remix', 'dj-mix', 'soundtrack', 'mixtape/street', 'demo', 'interview', 'spokenword'}
+PRIMARY_RANK = {'album': 0, 'ep': 1, 'single': 2}
+
+
+def pick_release(releases):
+    """pick the most 'original' release: official album > ep > single, no compilations/live/etc, earliest date wins"""
+    def score(rel):
+        rg = rel.get('release-group', {})
+        primary = (rg.get('primary-type') or rg.get('type') or '').lower()
+        secondary = {s.lower() for s in rg.get('secondary-type-list', [])}
+        status = (rel.get('status') or 'official').lower()
+
+        bad = (status != 'official') + len(secondary & BAD_SECONDARY)
+        rank = PRIMARY_RANK.get(primary, 3)
+        date = rel.get('date') or '9999'
+        return (bad, rank, date)
+
+    return min(releases, key=score) if releases else None
+
+
 def tag_file(file_path, artist, song):
     print(f'matching artist ({artist}) and title ({song})')
     query = f'recording:"{song}" AND artist:"{artist}" AND type:album AND NOT secondarytype:compilation'
@@ -64,7 +84,7 @@ def tag_file(file_path, artist, song):
     track_position = None
 
     if releases:
-        release = releases[0]
+        release = pick_release(releases)
         album_title = release.get('title')
         release_id = release.get('id')
         release_date = release.get('date', '')

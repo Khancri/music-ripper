@@ -41,6 +41,15 @@ def get_playlist_entries(url):
         else:
             return None  # single video
 
+def get_song_info(url):
+    ydl_opts = {
+        'quiet': True,
+        'extract_flat': True,  # don't download, just get metadata
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        return info
+
 def main():
     url = input('url to download: ').strip()
     path = input('save to folder [.]: ').strip() or '.'
@@ -49,10 +58,26 @@ def main():
     entries = get_playlist_entries(url)
 
     if entries is None:
-        # single track
-        artist = input('artist: ')
-        name = input('name: ')
-        download_and_tag(path, url, artist, name)
+        # playlist
+        entry = get_song_info(url)
+        artist = None
+        title = entry.get('title', 'unknown')
+
+        channel = entry.get('uploader') or entry.get('channel')
+        try:
+            guess_a, guess_t = guess_artist_title(title, channel)
+        except Exception as e:
+            print('something happened thats bad, idunno man', e)
+
+        artist = input(f'  artist [{guess_a or ""}]: ').strip() or guess_a
+        name = input(f'  track name [{guess_t or ""}]: ').strip() or guess_t
+        
+
+        try:
+            download_and_tag(path, url, artist, name)
+        except Exception as e:
+            print('something happened?? skipping and continuing\n', e)
+
     else:
         # playlist
         entryMeta = []
