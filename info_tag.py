@@ -1,4 +1,5 @@
 import mimetypes
+import re
 import requests
 import musicbrainzngs
 from mutagen.mp3 import MP3
@@ -50,7 +51,52 @@ def pick_release(releases):
     return min(releases, key=score) if releases else None
 
 
-def tag_file(file_path, artist, song):
+DURATION_TOLERANCE = 3  # seconds
+
+
+def pick_recording(recordings, duration=None):
+    """pick the recording whose length is closest to the youtube duration.
+    only looks at recordings that matched the search about as well as the top hit,
+    so a bad title match with a lucky length can't win."""
+    if not recordings:
+        return None
+    if not duration:
+        return recordings[0]
+
+    top = max(int(r.get('ext:score', 0)) for r in recordings)
+    close = [r for r in recordings if int(r.get('ext:score', 0)) >= top - 10]
+
+    best, best_diff = None, None
+    for r in close:
+        if not r.get('length'):
+            continue  # no length listed, can't compare
+        diff = abs(int(r['length']) / 1000 - duration)
+        if diff <= DURATION_TOLERANCE and (best_diff is None or diff < best_diff):
+            best, best_diff = r, diff
+
+    if best is None:
+        print(f'  ⚠ nothing within {DURATION_TOLERANCE}s of {duration}s, using top search hit')
+        return recordings[0]
+    print(f'  length match: off by {best_diff:.1f}s')
+    return best
+
+
+# apple/spotify style suffixes that musicbrainz titles usually don't have
+REMASTER_PATTERNS = [
+    r'\s*[\(\[][^\)\]]*(remaster|re-master|mono|stereo|deluxe|anniversary|expanded|bonus)[^\)\]]*[\)\]]',
+    r'\s+-\s+(\d{4}\s+)?remaster(ed)?(\s+\d{4})?.*$',
+]
+
+
+def clean_search_title(song):
+    """strip '(2004 Remaster)' style tags so the search finds the actual song"""
+    for pattern in REMASTER_PATTERNS:
+        song = re.sub(pattern, '', song, flags=re.IGNORECASE)
+    return song.strip() or song
+
+
+def tag_file(file_path, artist, song, duration=None):
+    song = clean_search_title(song)
     print(f'matching artist ({artist}) and title ({song})')
     query = f'recording:"{song}" AND artist:"{artist}" AND type:album AND NOT secondarytype:compilation'
     result = musicbrainzngs.search_recordings(query=query, limit=10)
@@ -66,11 +112,11 @@ def tag_file(file_path, artist, song):
     recording = None
     if manual:
         for i, record in enumerate(recordings):
-            print(f'[{i+1}]: {record['title']} - {record['artist-credit'][0]['artist']['name']}')
+            print(f'[{i+1}]: {record["title"]} - {record["artist-credit"][0]["artist"]["name"]} ({int(record.get("length", 0))/1000:.0f}s)')
         print('pick recording')
         recording = recordings[int(input())-1]
     else:
-        recording = recordings[0]
+        recording = pick_recording(recordings, duration)
     print(f"  matched: {recording['title']} — {recording['artist-credit'][0]['artist']['name'] if recording.get('artist-credit') else '?'}")
 
     track_title = recording.get('title', song)

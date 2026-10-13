@@ -1,6 +1,6 @@
 import yt_dlp
 import os
-from info_tag import tag_file
+from info_tag import tag_file, clean_search_title
 from title_guess import guess_artist_title
 
 def download_and_tag(path, url, artist, name):
@@ -24,7 +24,7 @@ def download_and_tag(path, url, artist, name):
         if not os.path.exists(file_path):
             file_path = file_path.rsplit('.', 1)[0] + ".mp3"
             print(f"stored in {file_path}")
-        tag_file(file_path, artist, name)
+        tag_file(file_path, artist, name, duration=info.get('duration'))
         print(f'✓ done: {name} by {artist}\n')
         return file_path
 
@@ -66,6 +66,7 @@ def main():
         channel = entry.get('uploader') or entry.get('channel')
         try:
             guess_a, guess_t = guess_artist_title(title, channel)
+            guess_t = clean_search_title(guess_t)
         except Exception as e:
             print('something happened thats bad, idunno man', e)
 
